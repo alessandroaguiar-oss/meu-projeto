@@ -1511,10 +1511,10 @@ function normMotivo(s) {
 
 /* ── load ── */
 async function fetchSheet(sheetName, range) {
-  const url = `/api/dados?sheet=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName + '!' + range)}?key=${API_KEY}`;
   const res  = await fetch(url);
   const json = await res.json();
-  if (json.error) throw new Error(`[${sheetName}] ${json.error}`);
+  if (json.error) throw new Error(`[${sheetName}] ${json.error.message || json.error}`);
   return json.values || [];
 }
 
