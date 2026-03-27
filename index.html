@@ -1044,13 +1044,13 @@
 
 <!-- ══ FILTERS ══ -->
 <div class="filter-bar">
-  <div class="fg date-locked" id="grp-di">
+  <div class="fg" id="grp-di">
     <label>Data início &nbsp;<span class="lbl-ok" id="lbl-di">● –</span></label>
-    <input type="date" id="f-di" style="min-width:140px;" onchange="clampDates()">
+    <input type="date" id="f-di" style="min-width:140px;">
   </div>
-  <div class="fg date-locked" id="grp-df">
+  <div class="fg" id="grp-df">
     <label>Data fim &nbsp;<span class="lbl-ok" id="lbl-df">● –</span></label>
-    <input type="date" id="f-df" style="min-width:140px;" onchange="clampDates()">
+    <input type="date" id="f-df" style="min-width:140px;">
   </div>
   <div class="fg">
     <label>Carga</label>
@@ -1186,7 +1186,10 @@
         <div style="font-family:var(--cond); font-size:18px; font-weight:800; color:#fff; letter-spacing:.06em; text-transform:uppercase;">👥 Resumo por Motorista</div>
         <div style="font-family:var(--mono); font-size:10px; color:rgba(255,255,255,.4); letter-spacing:.08em; margin-top:3px;" id="mot-panel-period"></div>
       </div>
-      <button onclick="closeMotoristasPanel()" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:rgba(255,255,255,.7); border-radius:8px; padding:8px 18px; cursor:pointer; font-family:var(--mono); font-size:11px; transition:all .15s;" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">✕ Fechar</button>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button onclick="printMotoristasTable()" title="Imprimir tabela de Motoristas" style="display:inline-flex; align-items:center; gap:6px; background:rgba(14,122,191,.15); border:1px solid rgba(14,122,191,.4); color:#38d8c0; border-radius:8px; padding:8px 16px; cursor:pointer; font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; transition:all .15s;" onmouseover="this.style.background='rgba(14,122,191,.3)'" onmouseout="this.style.background='rgba(14,122,191,.15)'">🖨 Imprimir</button>
+        <button onclick="closeMotoristasPanel()" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:rgba(255,255,255,.7); border-radius:8px; padding:8px 18px; cursor:pointer; font-family:var(--mono); font-size:11px; transition:all .15s;" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">✕ Fechar</button>
+      </div>
     </div>
     <div style="background:#0d2a40; border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden;">
       <table id="mot-table" style="width:100%; border-collapse:collapse;">
@@ -1363,26 +1366,15 @@ window.addEventListener('DOMContentLoaded', () => {
   const dfEl = document.getElementById('f-df');
   diEl.value = DATE_MIN;
   dfEl.value = DATE_MAX;
-  diEl.setAttribute('min', DATE_MIN);
-  diEl.setAttribute('max', DATE_MAX);
-  dfEl.setAttribute('min', DATE_MIN);
-  dfEl.setAttribute('max', DATE_MAX);
 
   document.getElementById('lbl-di').textContent = '● ' + range.labelIni;
   document.getElementById('lbl-df').textContent = '● ' + range.labelFim;
   // Dados carregados após login
 });
 
-/* Impede que o usuário saia do intervalo permitido (apenas no modo bloqueado) */
+/* Datas sempre livres — sem restrição de intervalo */
 function clampDates() {
-  if (editUnlocked) return;
-  const di = document.getElementById('f-di');
-  const df = document.getElementById('f-df');
-  if (di.value < DATE_MIN) di.value = DATE_MIN;
-  if (di.value > DATE_MAX) di.value = DATE_MAX;
-  if (df.value < DATE_MIN) df.value = DATE_MIN;
-  if (df.value > DATE_MAX) df.value = DATE_MAX;
-  if (di.value > df.value) di.value = df.value;
+  // Datas liberadas para qualquer período
 }
 
 /* ── LOCK / EDIT MODE ── */
@@ -1393,11 +1385,9 @@ function toggleLock() {
   const pwdEl   = document.getElementById('lock-pwd');
   const btnEl   = document.getElementById('btn-lock');
   const statusEl = document.getElementById('lock-status');
-  const grpDi   = document.getElementById('grp-di');
-  const grpDf   = document.getElementById('grp-df');
 
   if (editUnlocked) {
-    // Bloqueia — restaura datas para o período fixo calculado
+    // Bloqueia
     editUnlocked = false;
     pwdEl.value = '';
     pwdEl.classList.remove('unlocked');
@@ -1407,16 +1397,6 @@ function toggleLock() {
     btnEl.title = 'Liberar edição';
     statusEl.textContent = 'Bloqueado';
     statusEl.classList.remove('unlocked');
-    grpDi.classList.remove('date-unlocked'); grpDi.classList.add('date-locked');
-    grpDf.classList.remove('date-unlocked'); grpDf.classList.add('date-locked');
-    const diEl = document.getElementById('f-di');
-    const dfEl = document.getElementById('f-df');
-    diEl.value = DATE_MIN;
-    dfEl.value = DATE_MAX;
-    diEl.setAttribute('min', DATE_MIN);
-    diEl.setAttribute('max', DATE_MAX);
-    dfEl.setAttribute('min', DATE_MIN);
-    dfEl.setAttribute('max', DATE_MAX);
     toast('🔒 Modo edição bloqueado');
   } else {
     // Tenta desbloquear
@@ -1436,13 +1416,6 @@ function toggleLock() {
     btnEl.title = 'Bloquear edição';
     statusEl.textContent = 'Edição liberada';
     statusEl.classList.add('unlocked');
-    grpDi.classList.remove('date-locked'); grpDi.classList.add('date-unlocked');
-    grpDf.classList.remove('date-locked'); grpDf.classList.add('date-unlocked');
-    // Remove restrição de min/max
-    document.getElementById('f-di').removeAttribute('min');
-    document.getElementById('f-di').removeAttribute('max');
-    document.getElementById('f-df').removeAttribute('min');
-    document.getElementById('f-df').removeAttribute('max');
     toast('🔓 Modo edição liberado');
   }
 }
@@ -2546,6 +2519,81 @@ function renderMotoristasTable(showF, showA, showS) {
       ${showA ? `<td class="mot-td-val ${r.avaria > 0 ? 'mot-td-a' : 'mot-td-zero'}">${r.avaria > 0 ? 'R$ '+fmtNum(r.avaria) : '–'}</td>` : ''}
       ${showS ? `<td class="mot-td-val ${r.sobra  > 0 ? 'mot-td-s' : 'mot-td-zero'}">${r.sobra  > 0 ? 'R$ '+fmtNum(r.sobra)  : '–'}</td>` : ''}
     </tr>`).join('');
+}
+
+/* ══ IMPRESSÃO DA TABELA DE MOTORISTAS ══ */
+function printMotoristasTable() {
+  const showF = document.getElementById('mot-th-falta') .style.display !== 'none';
+  const showA = document.getElementById('mot-th-avaria').style.display !== 'none';
+  const showS = document.getElementById('mot-th-sobra') .style.display !== 'none';
+
+  const periodo = document.getElementById('mot-panel-period').textContent;
+  const tbodyHtml = document.getElementById('mot-tbody').innerHTML;
+
+  // Monta os headers conforme colunas visíveis
+  const thFalta  = showF ? '<th style="text-align:right;">Faltas (R$)</th>'  : '';
+  const thAvaria = showA ? '<th style="text-align:right;">Avarias (R$)</th>' : '';
+  const thSobra  = showS ? '<th style="text-align:right;">Sobras (R$)</th>'  : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Motoristas – Resumo</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Barlow+Condensed:wght@700;800&family=DM+Mono:wght@400;500&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter', sans-serif; background:#fff; color:#111; padding:32px 40px; }
+    .header { border-bottom:3px solid #1a8fd1; padding-bottom:14px; margin-bottom:20px; }
+    .empresa { font-family:'Barlow Condensed', sans-serif; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#555; margin-bottom:4px; }
+    .titulo  { font-family:'Barlow Condensed', sans-serif; font-size:26px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#0e7abf; line-height:1; }
+    .periodo { font-family:'DM Mono', monospace; font-size:11px; color:#555; margin-top:5px; }
+    table { width:100%; border-collapse:collapse; margin-top:4px; }
+    thead tr { background:#1a8fd1; }
+    thead th { padding:9px 12px; text-align:left; font-family:'Barlow Condensed', sans-serif; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#fff; }
+    thead th:not(:first-child) { text-align:right; }
+    tbody tr { border-bottom:1px solid #eee; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:nth-child(even) { background:#f5f9fd; }
+    tbody td { padding:9px 12px; font-size:13px; vertical-align:middle; }
+    .mot-td-name { font-family:'Inter', sans-serif; font-weight:600; color:#0d2a40; }
+    .mot-td-val  { font-family:'DM Mono', monospace; font-size:12px; font-weight:700; text-align:right; white-space:nowrap; }
+    .mot-td-f    { color:#c02040; }
+    .mot-td-a    { color:#b05010; }
+    .mot-td-s    { color:#0a9068; }
+    .mot-td-zero { color:#aaa; }
+    .footer { margin-top:24px; font-family:'DM Mono', monospace; font-size:10px; color:#aaa; text-align:right; }
+    @media print {
+      body { padding:16px 20px; }
+      @page { margin:1.5cm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="empresa">🚛 Transporte Andrade</div>
+    <div class="titulo">👥 Resumo por Motorista</div>
+    <div class="periodo">${periodo}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Motorista</th>
+        ${thFalta}
+        ${thAvaria}
+        ${thSobra}
+      </tr>
+    </thead>
+    <tbody>${tbodyHtml}</tbody>
+  </table>
+  <div class="footer">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=600');
+  win.document.write(html);
+  win.document.close();
 }
 
 const MASTER_PWD_HASH = '832288da41e0c5ff34c615b65fa0a08ca9e4a2fc833c82d9e3fabcdee6cb2840';
