@@ -1310,9 +1310,16 @@ const RANGE_FA = 'B6:P';
 const CF = { DATA:0, CODIGO:1, DESCRICAO:2, QTD:3, VALOR:7, CARGA:8, MOTIVO:6, MOTORISTA:9, RESP:11, TRATATIVA:12 };
 
 // ── Aba CONSULTA SOBRA ──
+// D3:T → [0]=COD [1]=DESC [2]=? [3]=QTD [4]=? [5]=CARGA [6]=? [7]=MOTORISTA [8]=DATA
+//         [9..12]=? [13]=VALOR [14]=? [15]=STATUS(col S) [16]=TRATATIVA(col T)
 const SHEET_S = '🍁 CONSULTA SOBRA';
-const RANGE_S = 'D3:Q';
-const CS = { CODIGO:0, DESCRICAO:1, QTD:3, CARGA:5, MOTORISTA:7, DATA:8, VALOR:13 };
+const RANGE_S = 'D3:T';
+const CS = { CODIGO:0, DESCRICAO:1, QTD:3, CARGA:5, MOTORISTA:7, DATA:8, VALOR:13, STATUS:15, TRATATIVA:16 };
+
+// Valores de status da sobra (normalizados)
+const SOBRA_ERRO_MOTORISTA = 'ERRO DO MOTORISTA';
+const SOBRA_ERRO_SEPARACAO = 'ERRO DE SEPARACAO';
+const SOBRA_FORA_INDICE    = 'RESULTADO FORA DO INDICE DE DIVERGENCIA';
 
 const API_KEY    = 'AIzaSyBwvNC2bf6Ix8atG07BhzcvxhlnhyiPgv4'; // removido — agora fica no servidor
 const FALTA_RESP_FILTRO = 'ERRO DO MOTORISTA';
@@ -1355,7 +1362,7 @@ let _originalHtmlSource = document.documentElement.outerHTML;
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('api-key').value     = '*** protegida ***';
-  document.getElementById('range-input').value = 'CONSULTA B6:O | SOBRA D3:Q';
+  document.getElementById('range-input').value = 'CONSULTA B6:O | SOBRA D3:T';
 
   // Calcula datas dinamicamente
   const range = calcDateRange();
@@ -1604,6 +1611,7 @@ function processRows(rowsFA, rowsS) {
 
   // ── Processa CONSULTA SOBRA ──
   // Sobras usam a mesma chave (carga + data) para unir com FA quando existir
+  // Apenas sobras com STATUS = "ERRO DO MOTORISTA" aparecem no painel principal
   for (const row of rowsS) {
     const data      = String(row[CS.DATA]      ?? '').trim();
     const carga     = String(row[CS.CARGA]     ?? '').trim();
@@ -1612,12 +1620,17 @@ function processRows(rowsFA, rowsS) {
     const codigo    = String(row[CS.CODIGO]    ?? '').trim() || '–';
     const descricao = String(row[CS.DESCRICAO] ?? '').trim() || '(sem descrição)';
     const qtd       = String(row[CS.QTD]       ?? '').trim() || '–';
+    const status    = String(row[CS.STATUS]    ?? '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    const tratativa = String(row[CS.TRATATIVA] ?? '').trim();
 
     if (!carga && !data) continue;
 
+    // Apenas exibe no painel as sobras de ERRO DO MOTORISTA
+    if (status !== SOBRA_ERRO_MOTORISTA) continue;
+
     const key  = carga || ('_s_' + dateKey(data));
     const g    = getOrCreate(map, key, data, carga, motorista);
-    const item = { codigo, descricao, qtd, valor, data };
+    const item = { codigo, descricao, qtd, valor, tratativa, status, data };
 
     g.sobras.push(item);
     g.valSobra += valor;
@@ -2144,20 +2157,28 @@ function buildSection(items, tipo, label, icon) {
   if (!items.length) return '';
   const sorted = [...items].sort((a, b) => b.valor - a.valor);
   const totalVal = sorted.reduce((s, i) => s + i.valor, 0);
-  const rows = sorted.map(i => `
+  // Sobras: mostrar coluna de tratativa (assim como faltas)
+  const showTratativa = tipo === 'f' || tipo === 's';
+  const rows = sorted.map(i => {
+    const tratativaCell = showTratativa
+      ? `<td class="td-tratativa ${i.tratativa?'':'empty'}">${i.tratativa||''}</td>`
+      : '';
+    return `
     <tr>
       <td class="td-cod">${i.codigo}</td>
       <td class="td-desc">${i.descricao}</td>
       <td class="td-qtd">${i.qtd}</td>
       <td class="td-val ${tipo}">R$ ${fmtNum(i.valor)}</td>
-      <td class="td-tratativa ${i.tratativa?'':'empty'}">${i.tratativa||''}</td>
-    </tr>`).join('');
+      ${tratativaCell}
+    </tr>`;
+  }).join('');
   const totalRow = `
     <tr class="detail-total-row">
       <td colspan="3" style="color:rgba(255,255,255,.45);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--mono);">Total ${label}</td>
       <td class="td-val ${tipo}">R$ ${fmtNum(totalVal)}</td>
-      <td></td>
+      ${showTratativa ? '<td></td>' : ''}
     </tr>`;
+  const thTratativa = showTratativa ? '<th>Tratativa</th>' : '';
   return `
     <div class="detail-section">
       <div class="detail-section-title ${tipo}">
@@ -2166,7 +2187,7 @@ function buildSection(items, tipo, label, icon) {
       </div>
       <table class="detail-mini-table">
         <thead><tr>
-          <th>Código</th><th>Descrição</th><th>Qtd</th><th>Valor</th><th>Tratativa</th>
+          <th>Código</th><th>Descrição</th><th>Qtd</th><th>Valor</th>${thTratativa}
         </tr></thead>
         <tbody>${rows}${totalRow}</tbody>
       </table>
@@ -2177,7 +2198,15 @@ function buildDetailHTML(r, tipo) {
   let html = '<div class="detail-inner">';
   if (tipo === 'f' || tipo === 'all') html += buildSection(r.faltas,  'f', 'Falta',  '🔻');
   if (tipo === 'a' || tipo === 'all') html += buildSection(r.avarias, 'a', 'Avaria', '⚠️');
-  if (tipo === 's' || tipo === 'all') html += buildSection(r.sobras,  's', 'Sobra',  '🔺');
+  if (tipo === 's' || tipo === 'all') {
+    // Aviso de filtro: painel exibe apenas sobras "Erro do Motorista"
+    const sobraHeader = r.sobras.length
+      ? `<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:rgba(12,184,128,.7);margin-bottom:6px;padding:3px 8px;background:rgba(12,184,128,.08);border-left:2px solid rgba(12,184,128,.3);border-radius:0 4px 4px 0;">
+           🔺 Exibindo apenas sobras classificadas como <strong style="color:#0cb880;">Erro do Motorista</strong>
+         </div>`
+      : '';
+    html += sobraHeader + buildSection(r.sobras, 's', 'Sobra', '🔺');
+  }
   if (html === '<div class="detail-inner">') html += '<p style="color:var(--muted);font-family:var(--mono);font-size:12px;padding:12px 0;">Sem ocorrências para exibir.</p>';
   return html + '</div>';
 }
